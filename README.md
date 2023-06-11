@@ -55,7 +55,7 @@ Processing gpt3.5_am1_automarkup with xater_metric
             data/html/test3.txt (out/gpt3.5_am1_automarkup/html/test3/test3.xml): 16.67%
      Average gpt3.5_am1_automarkup / xater_metric / html: 13.77%
      Average gpt3.5_am1_automarkup / xater_metric: 8.48%
-'''
+```
 
 `gpt3.5_am1_automarkup` is an automarkup system based on GPT-4 and Prompt Engineering.
 

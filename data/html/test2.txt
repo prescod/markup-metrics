@@ -1,0 +1,23 @@
+Meeting Notes - 9 June 2023
+New Feature Discussion
+
+People: 
+Jane - Project Manager
+Tom - Developer
+Sarah - Designer
+
+Agenda:
+- Talk about new features
+- Finalize the design
+
+Discussion:
+1. Jane started the meeting.
+2. Tom suggested a new search bar - link: www.example.com/searchbar
+3. Sarah showed new design mockup - image at: C:/images/design.png
+4. Team agreed to work on search bar and new design.
+
+Next steps:
+- Tom to create a prototype.
+- Sarah to finalize designs.
+
+Meeting concluded at 3:00 PM.

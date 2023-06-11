@@ -1,0 +1,15 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+    <title>My HTML document</title>
+</head>
+<body>
+    <h1>My HTML document</h1>
+
+    <p>This is my HTML document.</p>
+
+    <p>There are many documents like it...</p>
+
+    <p>But none are quite as <em>great</em> as mine!</p>
+</body>
+</html>

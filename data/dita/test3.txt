@@ -1,0 +1,7 @@
+** My DITA document **
+
+This is my DITA document.
+
+There are many documents like it...
+
+But none are quite as _great_ as mine!

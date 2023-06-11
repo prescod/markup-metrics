@@ -1,0 +1,8 @@
+Convert the following text into XHTML.
+
+Keep the text as similar to the original as possible.
+
+Use this doctype:
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+   "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">

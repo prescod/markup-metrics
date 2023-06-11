@@ -1,0 +1,38 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+    <title>Meeting Notes - 9 June 2023</title>
+</head>
+<body>
+    <h1>Meeting Notes - 9 June 2023 - New Feature Discussion</h1>
+
+    <h2>People:</h2>
+    <ul>
+        <li>Jane - Project Manager</li>
+        <li>Tom - Developer</li>
+        <li>Sarah - Designer</li>
+    </ul>
+
+    <h2>Agenda:</h2>
+    <ul>
+        <li>Talk about new features</li>
+        <li>Finalize the design</li>
+    </ul>
+
+    <h2>Discussion:</h2>
+    <ol>
+        <li>Jane started the meeting.</li>
+        <li>Tom suggested a new search bar - link: <a href="http://www.example.com/searchbar">www.example.com/searchbar</a></li>
+        <li>Sarah showed new design mockup - image at: C:/images/design.png</li>
+        <li>Team agreed to work on search bar and new design.</li>
+    </ol>
+
+    <h2>Next steps:</h2>
+    <ul>
+        <li>Tom to create a prototype.</li>
+        <li>Sarah to finalize designs.</li>
+    </ul>
+
+    <p>Meeting concluded at 3:00 PM.</p>
+</body>
+</html>

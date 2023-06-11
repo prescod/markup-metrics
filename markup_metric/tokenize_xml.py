@@ -1,0 +1,51 @@
+import xml.sax
+
+
+class TokenizingSaxHandler(xml.sax.ContentHandler):
+    def __init__(self):
+        self.tokens = []
+        self.chars = []
+
+    def startElement(self, name, attrs):
+        self.tokens.append(f"<{name} ")
+        # Sort attributes by key
+        for attr_name in sorted(attrs.keys()):
+            self.tokens.append(f'{attr_name}="{attrs[attr_name]}" ')
+        self.tokens.append(">")
+
+    def endElement(self, name):
+        # Process characters buffer as text
+        text = ''.join(self.chars).strip()
+        if text:
+            self.tokens.append(text)
+        self.chars = []
+        self.tokens.append(f"</{name}>")
+
+
+    def characters(self, content):
+        # Buffer characters for later processing
+        self.chars.append(content)
+
+
+def tokenize_xml(xml_string):
+    handler = TokenizingSaxHandler()
+    xml.sax.parseString(xml_string, handler)
+    return handler.tokens
+
+if __name__=="__main__":
+    # Test XML
+    xml_string = """
+    <note date="8/31/12" to="Tove">
+        <to>Tove</to>
+        <from>Jani</from>
+        <heading type="Reminder" priority="high">Don't forget me this weekend!</heading>
+        <body>Dear Tove, wish you have a nice weekend!</body>
+    </note>
+    """
+
+    # Run the parser
+    tokens = parse_xml(xml_string)
+
+    # Output the tokens
+    for token in tokens:
+        print(token)

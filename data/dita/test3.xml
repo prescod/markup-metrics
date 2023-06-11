@@ -1,0 +1,9 @@
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="my_dita_document">
+    <title>My DITA document</title>
+    <body>
+        <p>This is my DITA document.</p>        
+        <p>There are many documents like it...</p>
+        <p>But none are quite as <b>great</b> as mine!</p>
+    </body>
+</topic>

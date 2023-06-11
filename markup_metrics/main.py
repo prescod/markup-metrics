@@ -6,9 +6,10 @@ import argparse
 from xml.etree.ElementTree import XMLParser, parse
 from xml.sax import SAXParseException
 from metrics.types import MetricInput
-from typing import Callable, Optional, Tuple, Type
+from typing import Any, Callable, List, NamedTuple, Optional, Protocol, Tuple, Type
 import statistics
 from markup_metrics.tokenize_xml import tokenize_xml
+from prettytable import PrettyTable
 
 
 def load_class(script: str, class_name: str):
@@ -128,13 +129,32 @@ def load_engine(engine_script: str, class_name: str) -> Optional[Type]:
     return engine_instance
 
 
+# Protocol for engines
+class Engine(Protocol):
+    name: str
+
+# Type alias for tokenizer
+Tokenizer = Callable[..., Any]
+
+# NamedTuple for schema score
+class SchemaScore(NamedTuple):
+    schema_name: str
+    average_score: float
+
+# NamedTuple for the result of processing a combination
+class ProcessingResult(NamedTuple):
+    markup_engine_name: str
+    metric_engine_name: str
+    schema_scores: List[SchemaScore]
+
+
 def process_automarkup_metric_combination(
-    markup_engine: Type,
-    metric_engine: Type,
-    datadir: Path,
-    outdir: Path,
-    tokenizer: Callable,
-):
+        markup_engine: Engine,
+        metric_engine: Engine,
+        datadir: Path,
+        outdir: Path,
+        tokenizer: Tokenizer
+) -> ProcessingResult:
 
     engine_outdir = outdir / markup_engine.name
 
@@ -150,17 +170,56 @@ def process_automarkup_metric_combination(
 
             if file_count > 0:
                 average_score = score_sum / file_count
-                schema_scores.append(average_score)
-                print(
-                    f"     Average {markup_engine.name} / {metric_engine.name} / {schema_name}: {average_score:.2f}{metric_engine.unit}"
-                )
+                schema_scores.append(SchemaScore(schema_name, average_score))
 
-    if schema_scores:
-        overall_average = statistics.mean(schema_scores)
-        print(
-            f"     Average {markup_engine.name} / {metric_engine.name}: {overall_average:.2f}{metric_engine.unit}\n"
-        )
+    return ProcessingResult(markup_engine.name, metric_engine.name, schema_scores)
 
+
+def output_results(automarkup_engine_scripts, metric_engine_scripts, datadir, outdir, tokenizer):
+    markup_engines = [load_engine(automarkup_engine_script, "AutoMarkup") for automarkup_engine_script in automarkup_engine_scripts]
+    markup_engines = [markup_engine for markup_engine in markup_engines if markup_engine is not None]
+
+    metric_engines = [load_engine(metric_engine_script, "MetricEngine") for metric_engine_script in metric_engine_scripts]
+    metric_engines = [metric_engine for metric_engine in metric_engines if metric_engine is not None]
+
+    table_data = []
+
+    for markup_engine in markup_engines:
+        for metric_engine in metric_engines:
+            print(f"Processing {markup_engine.name} with {metric_engine.name}")
+
+            result = process_automarkup_metric_combination(
+                markup_engine,
+                metric_engine,
+                datadir,
+                outdir,
+                tokenizer,
+            )
+
+            for schema_score in result.schema_scores:
+                table_data.append({
+                    "Markup Engine": result.markup_engine_name,
+                    "Metric Engine": result.metric_engine_name,
+                    "Schema Name": schema_score.schema_name,
+                    "Average Score": f"{schema_score.average_score:.2f}{metric_engine.unit}"
+                })
+
+            if result.schema_scores:
+                overall_average = statistics.mean(score.average_score for score in result.schema_scores)
+                table_data.append({
+                    "Markup Engine": result.markup_engine_name,
+                    "Metric Engine": result.metric_engine_name,
+                    "Schema Name": "Overall Average",
+                    "Average Score": f"{overall_average:.2f}{metric_engine.unit}"
+                })
+
+    # Output the data in table format
+    if table_data:
+        table = PrettyTable()
+        table.field_names = ["Markup Engine", "Metric Engine", "Schema Name", "Average Score"]
+        for row in table_data:
+            table.add_row([row["Markup Engine"], row["Metric Engine"], row["Schema Name"], row["Average Score"]])
+        print(table)
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate markup script.")
@@ -209,25 +268,9 @@ def main():
     if not automarkup_engine_scripts:
         print("No automarkup engines found.")
         return
+    
+    output_results(automarkup_engine_scripts, metric_engine_scripts, datadir, outdir, tokenizer)
 
-    markup_engines = [load_engine(automarkup_engine_script, "AutoMarkup") for automarkup_engine_script in automarkup_engine_scripts]
-    markup_engines = [markup_engine for markup_engine in markup_engines if markup_engine is not None]
-
-    metric_engines = [load_engine(metric_engine_script, "MetricEngine") for metric_engine_script in metric_engine_scripts]
-    metric_engines = [metric_engine for metric_engine in metric_engines if metric_engine is not None]
-
-    for markup_engine in markup_engines:
-        for metric_engine in metric_engines:
-            print(
-                f"Processing {markup_engine.name} with {metric_engine.name}"
-            )
-            process_automarkup_metric_combination(
-                markup_engine,
-                metric_engine,
-                datadir,
-                outdir,
-                tokenizer,
-            )
 
 
 if __name__ == "__main__":

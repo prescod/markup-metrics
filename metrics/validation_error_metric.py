@@ -13,6 +13,8 @@ class MetricEngine:
     The first well-formedness error drops the perfect score to 0.5.
     The score between 1 error and 100% errors is linear, based on the percent of correct tags.
     """
+
+    unit = "%"
     
     def calculate(self, input: MetricInput, output_file_path: Path) -> float:
         hypothesis_xml = input.hypothesis_text
@@ -61,7 +63,7 @@ class MetricEngine:
 
         wrong_tags_ratio = total_errors / total_elements
         score = (1 - perfect_score) * wrong_tags_ratio
-        return score
+        return score * 100
 
 # Test code
 if __name__ == "__main__":

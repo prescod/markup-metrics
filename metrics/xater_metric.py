@@ -7,6 +7,9 @@ from metrics.types import MetricInput
 
 
 class MetricEngine:
+
+    unit = "%"
+
     def calculate(self, input: MetricInput, output_file_path: Path) -> float:
         diffs = difflib.context_diff(
             input.hypthesis_tokens,
@@ -16,4 +19,4 @@ class MetricEngine:
         )
         cdiff = "\n".join(diffs)
         output_file_path.write_text(cdiff)
-        return pyter.ter(input.hypthesis_tokens, input.reference_tokens)
+        return pyter.ter(input.hypthesis_tokens, input.reference_tokens) * 100

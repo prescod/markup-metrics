@@ -26,8 +26,10 @@ class AutoMarkup:
 
     def __init__(self):
         self.llm = guidance.llms.OpenAI(self.model)
+        assert (
+            self.llm.api_key is not None
+        ), "You must provide an OpenAI API key to use the OpenAI LLM. Either pass it in the constructor, set the OPENAI_API_KEY environment variable, or create the file ~/.openai_api_key with your key in it."
         self.endpoint = guidance(self.message, llm=self.llm)  # type: ignore
-
 
     # note that guidance does caching, so I don't need to
     def automarkup(self, input_text: str, prompt: str) -> str:
@@ -39,5 +41,5 @@ class AutoMarkup:
             raise ValueError("No DOCTYPE found")
         else:
             markup = markup[doctype_loc:]
-        
+
         return markup.strip().strip("`")

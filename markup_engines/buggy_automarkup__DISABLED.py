@@ -1,3 +1,8 @@
+# Purpose: A buggy markup engine that is disabled by default.
+#
+# This engine can be used to test what happens when a markup engine
+# fails to produce valid markup.
+
 template = """<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
    "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html>

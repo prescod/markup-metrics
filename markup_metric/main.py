@@ -6,12 +6,12 @@ import argparse
 from xml.etree.ElementTree import XMLParser, parse
 from xml.sax import SAXParseException
 from metrics.types import MetricInput
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple, Type
 import statistics
 from markup_metric.tokenize_xml import tokenize_xml
 
 
-def load_module(script: str, class_name: str):
+def load_class(script: str, class_name: str):
     spec = importlib.util.spec_from_file_location("module", script)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -25,7 +25,7 @@ def parse_prompt(schema_dir: Path) -> str:
         return file.read()
 
 
-def parse_reference_text(xml_path: Path) -> str:
+def parse_reference_text(xml_path: Path) -> Optional[str]:
     try:
         with xml_path.open("r") as file:
             reference_text = file.read()
@@ -54,7 +54,9 @@ def process_file(
 
     output_text = automarkup.automarkup(input_text, prompt)
     relative_path = txt_path.relative_to(txt_path.parent.parent)
-    output_file_path = engine_outdir /  / relative_path.with_suffix(".xml")
+    output_file_path = (
+        engine_outdir / relative_path.parent / txt_path.stem / (txt_path.stem + ".xml")
+    )
     output_file_path.parent.mkdir(parents=True, exist_ok=True)
     with output_file_path.open("w") as output_file:
         output_file.write(output_text)
@@ -104,47 +106,60 @@ def process_schema_directory(
             if success:
                 file_count += 1
                 score_sum += score
-                print(f"            {txt_path} ({output_file}): {score}")
+                print(
+                    f"            {txt_path} ({output_file}): {score:.2f}{metric_engine.unit}"
+                )
             else:
                 error_count += 1
 
     return score_sum, file_count, error_count
 
 
+def load_engine(engine_script: str, class_name: str) -> Optional[Type]:
+    engine_class = load_class(engine_script, class_name)
+    engine_name = Path(engine_script).stem
+    engine_class.name = engine_name
+    try:
+        engine_instance = engine_class()
+    except AssertionError as e:
+        print(f"Cannot instantiate {class_name.lower()} engine: ", e)
+        print(f"Skipping {class_name.lower()} engine: ", engine_class.name)
+        return None
+    return engine_instance
+
+
 def process_automarkup_metric_combination(
-    automarkup_engine_script: str,
-    metric_engine_script: str,
+    markup_engine: Type,
+    metric_engine: Type,
     datadir: Path,
     outdir: Path,
     tokenizer: Callable,
 ):
-    automarkup = load_module(automarkup_engine_script, "AutoMarkup")
-    engine_name = Path(automarkup_engine_script).stem
-    automarkup.name = engine_name
-    metric_engine = load_module(metric_engine_script, "MetricEngine")
-    metric_name = Path(metric_engine_script).stem
-    metric_engine.name = metric_name
-    engine_outdir = outdir / engine_name
+
+    engine_outdir = outdir / markup_engine.name
 
     schema_scores = []
 
     for schema_dir in datadir.iterdir():
         if schema_dir.is_dir():
             schema_name = schema_dir.stem
+
             score_sum, file_count, _ = process_schema_directory(
-                schema_dir, automarkup(), metric_engine(), tokenizer, engine_outdir
+                schema_dir, markup_engine, metric_engine, tokenizer, engine_outdir
             )
 
             if file_count > 0:
                 average_score = score_sum / file_count
                 schema_scores.append(average_score)
                 print(
-                    f"     Average {engine_name} / {metric_name} / {schema_name}: {average_score}"
+                    f"     Average {markup_engine.name} / {metric_engine.name} / {schema_name}: {average_score:.2f}{metric_engine.unit}"
                 )
 
     if schema_scores:
         overall_average = statistics.mean(schema_scores)
-        print(f"     Average {engine_name} / {metric_name}: {overall_average}\n")
+        print(
+            f"     Average {markup_engine.name} / {metric_engine.name}: {overall_average:.2f}{metric_engine.unit}\n"
+        )
 
 
 def main():
@@ -179,13 +194,6 @@ def main():
     os.environ["XML_CATALOG_FILES"] = str(catalog_files)
     assert catalog_files.exists()
 
-    from lxml import etree
-
-    # xml_file_path = '/Users/paul/code/markup-metric/out/gpt3.5_turbo_automarkup/dita/test1.xml'
-    # parser = etree.XMLParser(dtd_validation=True, load_dtd=True, resolve_entities=True)
-    # tree = etree.parse(xml_file_path, parser=parser)
-    # assert not len(parser.error_log)
-
     tokenizer = tokenize_xml if not args.char_tokenizer else list
     datadir = Path(args.datadir)
     outdir = Path(args.outdir)
@@ -202,14 +210,20 @@ def main():
         print("No automarkup engines found.")
         return
 
-    for automarkup_engine_script in automarkup_engine_scripts:
-        for metric_engine_script in metric_engine_scripts:
+    markup_engines = [load_engine(automarkup_engine_script, "AutoMarkup") for automarkup_engine_script in automarkup_engine_scripts]
+    markup_engines = [markup_engine for markup_engine in markup_engines if markup_engine is not None]
+
+    metric_engines = [load_engine(metric_engine_script, "MetricEngine") for metric_engine_script in metric_engine_scripts]
+    metric_engines = [metric_engine for metric_engine in metric_engines if metric_engine is not None]
+
+    for markup_engine in markup_engines:
+        for metric_engine in metric_engines:
             print(
-                f"Processing {Path(automarkup_engine_script).stem} with {Path(metric_engine_script).stem}"
+                f"Processing {markup_engine.name} with {metric_engine.name}"
             )
             process_automarkup_metric_combination(
-                automarkup_engine_script,
-                metric_engine_script,
+                markup_engine,
+                metric_engine,
                 datadir,
                 outdir,
                 tokenizer,

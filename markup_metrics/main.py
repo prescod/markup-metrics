@@ -8,7 +8,7 @@ from xml.sax import SAXParseException
 from metrics.types import MetricInput
 from typing import Callable, Optional, Tuple, Type
 import statistics
-from markup_metric.tokenize_xml import tokenize_xml
+from markup_metrics.tokenize_xml import tokenize_xml
 
 
 def load_class(script: str, class_name: str):

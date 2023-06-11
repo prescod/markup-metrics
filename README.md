@@ -1,6 +1,6 @@
-# Markup Metric
+# Markup Metrics
 
-Markup Metric is a Testing Tool for comparing implementations
+Markup Metrics is a Testing Tool for comparing implementations
 of Automatic Markup (Auto-Markup) tools.
 
 ## Installation

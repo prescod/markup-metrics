@@ -44,7 +44,7 @@ if __name__=="__main__":
     """
 
     # Run the parser
-    tokens = parse_xml(xml_string)
+    tokens = tokenize_xml(xml_string)
 
     # Output the tokens
     for token in tokens:

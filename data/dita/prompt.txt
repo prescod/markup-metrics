@@ -1,5 +1,7 @@
-Convert the following text into a DITA document.
+Add tags to the following text to make it into a DITA document.
 
 Keep the text as similar to the original as possible.
+
+Never remove content.
 
 Make sure that the root element has an id.

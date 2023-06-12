@@ -1,3 +1,4 @@
+import tiktoken
 import os
 import json
 import hashlib
@@ -19,22 +20,26 @@ class AutoMarkup:
     {{~/user}}
 
     {{#assistant~}}
-    {{gen 'markup' temperature=0 max_tokens=3500}}
+    {{gen 'markup' temperature=0 max_tokens=%d}}
     {{~/assistant}}
     """
     model = "gpt-4"
+    max_tokens = 8191
 
     def __init__(self):
         self.llm = guidance.llms.OpenAI(self.model)
         assert (
             self.llm.api_key is not None
         ), "You must provide an OpenAI API key to use the OpenAI LLM. Either pass it in the constructor, set the OPENAI_API_KEY environment variable, or create the file ~/.openai_api_key with your key in it."
-        self.endpoint = guidance(self.message, llm=self.llm)  # type: ignore
 
     # note that guidance does caching, so I don't need to
     def automarkup(self, input_text: str, prompt: str) -> str:
         # Perform the automarkup
-        out = self.endpoint(input=input_text, prompt=prompt)
+        enc = tiktoken.encoding_for_model(self.model)
+        used_tokens = len(enc.encode(input_text + prompt + self.message))
+        available_tokens = self.max_tokens - used_tokens
+        endpoint = guidance(self.message % available_tokens, llm=self.llm)  # type: ignore
+        out = endpoint(input=input_text, prompt=prompt)
         markup = out["markup"]
         doctype_loc = markup.find("<!DOCTYPE")
         if doctype_loc == -1:

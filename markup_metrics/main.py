@@ -1,12 +1,16 @@
+import cProfile
+import contextlib
 import importlib.util
 import glob
 import os
 from pathlib import Path
 import argparse
+import shutil
+import time
 from xml.etree.ElementTree import XMLParser, parse
 from xml.sax import SAXParseException
 from metrics.types import MetricInput
-from typing import Any, Callable, List, NamedTuple, Optional, Protocol, Tuple, Type
+from typing import Any, Callable, Generator, List, NamedTuple, Optional, Protocol, Tuple, Type
 import statistics
 from markup_metrics.tokenize_xml import tokenize_xml
 from prettytable import PrettyTable
@@ -37,6 +41,22 @@ def parse_reference_text(xml_path: Path) -> Optional[str]:
         return None
 
 
+class ProfileLog(NamedTuple):
+    name: str
+    time: float
+
+class ProfileLogger:
+    def __init__(self) -> None:
+        self.times: List[ProfileLog] = []
+
+    @contextlib.contextmanager
+    def log_time(self, context:str) -> Generator[None, None, None]:
+        start = time.perf_counter()
+        yield
+        end = time.perf_counter()
+        self.times.append(ProfileLog(context, end - start))
+
+
 def process_file(
     txt_path: Path,
     automarkup,
@@ -44,6 +64,7 @@ def process_file(
     prompt: str,
     tokenizer: Callable,
     engine_outdir: Path,
+    prof_log: ProfileLogger,
 ) -> Tuple[float, bool, Optional[Path]]:
     xml_path = txt_path.with_suffix(".xml")
     reference_text = parse_reference_text(xml_path)
@@ -53,7 +74,8 @@ def process_file(
     with txt_path.open("r") as file:
         input_text = file.read()
 
-    output_text = automarkup.automarkup(input_text, prompt)
+    with prof_log.log_time(f"{metric_engine.name} for: {txt_path}"):  # <- Add this context manager
+        output_text = automarkup.automarkup(input_text, prompt)
     relative_path = txt_path.relative_to(txt_path.parent.parent)
     output_file_path = (
         engine_outdir / relative_path.parent / txt_path.stem / (txt_path.stem + ".xml")
@@ -75,12 +97,15 @@ def process_file(
         reference_text,
         tokenizer(output_text),
         tokenizer(reference_text),
+        profile_logger=prof_log
     )
-    metric_output = output_file_path.with_suffix(f".{metric_engine.name}.txt")
+    metric_output = Path(f"{output_file_path}__{metric_engine.name}")
     if metric_output.exists():
-        metric_output.unlink()
-
-    score = metric_engine.calculate(validator_input, metric_output)
+        shutil.rmtree(metric_output)
+        
+    metric_output.mkdir(parents=True, exist_ok=True)
+    with prof_log.log_time(f"{metric_engine.name} for : {txt_path}"):
+        score = metric_engine.calculate(validator_input, metric_output)
 
     return score, True, output_file_path
 
@@ -91,6 +116,7 @@ def process_schema_directory(
     metric_engine,
     tokenizer: Callable,
     engine_outdir: Path,
+    prof_log: ProfileLogger,
 ) -> Tuple[float, int, int]:
     prompt = parse_prompt(schema_dir)
     score_sum = 0
@@ -102,7 +128,7 @@ def process_schema_directory(
     for txt_path in schema_dir.glob("*.txt"):
         if txt_path.stem != "prompt":
             score, success, output_file = process_file(
-                txt_path, automarkup, metric_engine, prompt, tokenizer, engine_outdir
+                txt_path, automarkup, metric_engine, prompt, tokenizer, engine_outdir, prof_log
             )
             if success:
                 file_count += 1
@@ -153,7 +179,8 @@ def process_automarkup_metric_combination(
         metric_engine: Engine,
         datadir: Path,
         outdir: Path,
-        tokenizer: Tokenizer
+        tokenizer: Tokenizer,
+        prof_log: ProfileLogger
 ) -> ProcessingResult:
 
     engine_outdir = outdir / markup_engine.name
@@ -165,7 +192,7 @@ def process_automarkup_metric_combination(
             schema_name = schema_dir.stem
 
             score_sum, file_count, _ = process_schema_directory(
-                schema_dir, markup_engine, metric_engine, tokenizer, engine_outdir
+                schema_dir, markup_engine, metric_engine, tokenizer, engine_outdir, prof_log
             )
 
             if file_count > 0:
@@ -183,6 +210,7 @@ def output_results(automarkup_engine_scripts, metric_engine_scripts, datadir, ou
     metric_engines = [metric_engine for metric_engine in metric_engines if metric_engine is not None]
 
     table_data = []
+    times = ProfileLogger()
 
     for markup_engine in markup_engines:
         for metric_engine in metric_engines:
@@ -194,6 +222,7 @@ def output_results(automarkup_engine_scripts, metric_engine_scripts, datadir, ou
                 datadir,
                 outdir,
                 tokenizer,
+                times
             )
 
             for schema_score in result.schema_scores:
@@ -220,6 +249,13 @@ def output_results(automarkup_engine_scripts, metric_engine_scripts, datadir, ou
         for row in table_data:
             table.add_row([row["Markup Engine"], row["Metric Engine"], row["Schema Name"], row["Average Score"]])
         print(table)
+
+    log_file_path = outdir / 'time_logs.txt'
+    with log_file_path.open('w') as log_file:
+        log_file.write('Context\tTime (s)\tCalls\n')
+        for log in times.times:
+            log_file.write(f"{log.name}\t{log.time:.6f}\n")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate markup script.")

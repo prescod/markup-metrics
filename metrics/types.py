@@ -1,4 +1,8 @@
-from typing import NamedTuple, Sequence
+from __future__ import annotations
+from typing import TYPE_CHECKING, NamedTuple, Sequence
+
+if TYPE_CHECKING:
+    from markup_metrics.main import ProfileLogger
 
 
 class MetricInput(NamedTuple):
@@ -6,3 +10,4 @@ class MetricInput(NamedTuple):
     reference_text: str
     hypthesis_tokens: Sequence[str]
     reference_tokens: Sequence[str]
+    profile_logger: ProfileLogger

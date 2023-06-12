@@ -16,7 +16,7 @@ class MetricEngine:
 
     unit = "%"
     
-    def calculate(self, input: MetricInput, output_file_path: Path) -> float:
+    def calculate(self, input: MetricInput, output_file_dir: Path) -> float:
         hypothesis_xml = input.hypothesis_text
         perfect_score = 0
 
@@ -34,10 +34,10 @@ class MetricEngine:
 
         if num_wf_errors > 0:
             errors = list(map(str, well_formed_parser.error_log))
-            output_file_path.write_text("\n".join(["DTD errors:"] + errors))
+            output_file_path = output_file_dir / "well_formedness_errors.txt"
+            
+            output_file_path.write_text("\n".join( errors))
             perfect_score = 0.5
-            if "gpt4" in str(output_file_path) and "test3"  in str(output_file_path)and "html" in str(output_file_path):
-                breakpoint()
 
         # Check for DTD in the hypothesis
         has_dtd = '<!DOCTYPE' in hypothesis_xml
@@ -53,6 +53,7 @@ class MetricEngine:
             if num_dtd_errors > 0:
                 perfect_score = min(perfect_score, 0.2)
                 errors = list(map(str, dtd_parser.error_log))
+                output_file_path = output_file_dir / "dtd_errors.txt"
                 output_file_path.write_text("\n".join(["DTD errors: "] + errors ))
         else:
             num_dtd_errors = 0

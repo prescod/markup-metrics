@@ -8,6 +8,6 @@ if TYPE_CHECKING:
 class MetricInput(NamedTuple):
     hypothesis_text: str
     reference_text: str
-    hypthesis_tokens: Sequence[str]
+    hypothesis_tokens: Sequence[str]
     reference_tokens: Sequence[str]
     profile_logger: ProfileLogger

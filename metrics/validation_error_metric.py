@@ -1,6 +1,6 @@
 from pathlib import Path
 from lxml import etree
-from io import StringIO
+from io import BytesIO, StringIO
 from typing import List
 
 from metrics.types import MetricInput
@@ -22,7 +22,7 @@ class MetricEngine:
 
         # First, check if the XML is well-formed without DTD validation
         well_formed_parser = etree.XMLParser(recover=True)
-        well_formed_tree = etree.parse(StringIO(hypothesis_xml), well_formed_parser)
+        well_formed_tree = etree.parse(BytesIO(hypothesis_xml.encode()), well_formed_parser)
         
         # Count the number of well-formedness errors
         num_wf_errors = len(well_formed_parser.error_log)
@@ -45,7 +45,7 @@ class MetricEngine:
         # Perform DTD validation only if DTD is present
         if has_dtd:
             dtd_parser = etree.XMLParser(dtd_validation=True, load_dtd=True, recover=True, resolve_entities=True)
-            tree = etree.parse(StringIO(hypothesis_xml), dtd_parser)
+            tree = etree.parse(BytesIO(hypothesis_xml.encode()), dtd_parser)
             # Get the number of DTD errors
             num_dtd_errors = len(dtd_parser.error_log)
 

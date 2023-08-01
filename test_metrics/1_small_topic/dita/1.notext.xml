@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="pdf-plugin-structure">
+  <title></title>
+  <shortdesc></shortdesc>
+
+  <body>
+    <p><filepath></filepath><filepath></filepath></p>
+      <image href="folder_structure.png">
+        <alt></alt>
+      </image>
+  </body>
+</topic>

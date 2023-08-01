@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="pdf-plugin-structure">
+  <title>Structure du plug-in PDF</title>
+  <shortdesc>Dans les cas qui nécessitent des personnalisations substantielles, il est souvent utile d'organiser les fichiers dans une structure de dossier
+    qui imite la hiérarchie du plug-in PDF par défaut. Cette méthode facilite les comparaisons avec les paramètres par défaut
+    dans le plug-in PDF de base et facilite la migration des personnalisations vers de nouvelles versions de l'outil.</shortdesc>
+
+  <body>
+    <p>Pour commencer à créer un nouveau plug-in personnalisé, vous pouvez copier le dossier <filepath>plugins/org.dita.pdf2/Customization</filepath>
+      dans un nouveau dossier, tel que <filepath>plugins/com.company.pdf</filepath>.</p>
+      <image href="folder_structure.png">
+        <alt>Folder structure</alt>
+      </image>
+  </body>
+</topic>

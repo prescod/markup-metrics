@@ -34,8 +34,10 @@ like.
 
 ## Usage
 
+Set up a VENV with `pip3 install -e .`` and then run this:
+
 ```python
-python markup-metric.py
+python markup-metrics.py
 ```
 
 This runs all metrics against all engines (even two dummy/test engines).
@@ -95,6 +97,16 @@ are not counting the same thing.
 in the document. Zero means zero errors and 100 means, essentially,
 that "everything was wrong."
 
+If you change these metrics, or create new ones, and want to test
+them against specially written example documents, run:
+
+```sh
+$ python test-metrics.py
+```
+
+This will run all installed metrics against sample files
+described in test_metrics/README.md
+
 ## Built-In Auto-Markup Engines
 
 `dummy_automarkup.py`: does basically nothing. It returns a hard-coded
@@ -110,3 +122,10 @@ buggy_automarkup__DISABLED.py: A buggy markup engine that is disabled by default
 
 This engine can be used to test what happens when a markup engine
 fails to produce valid markup.
+
+## Folders
+
+This folder has files that test the extremes of
+metric engines.
+
+

@@ -1,0 +1,34 @@
+<?xml version="1.0" ?><!DOCTYPE task  PUBLIC '-//OASIS//DTD DITA Task//EN'  'task.dtd'><task id="washcar" xml:lang="en-us">
+  <title>Washing the car</title>
+  <shortdesc>Keep your car looking great by washing it regularly.</shortdesc>
+  <taskbody>
+    <steps>
+      <step>
+        <cmd>Move the car onto the driveway.</cmd>
+      </step>
+      <step>
+        <cmd>Attach the water hose to a spout and pull the free end over to the car.</cmd>
+      </step>
+      <step>
+        <cmd>Fill a bucket with soapy water.</cmd>
+      </step>
+      <step>
+        <cmd>Use a sponge to apply the soapy water to the car and scrub off the dirt.</cmd>
+      </step>
+      <step>
+        <cmd>Rinse the car by spraying clean water from the hose.</cmd>
+      </step>
+      <step>
+        <cmd>Dry the car using a dampened chamois.</cmd>
+      </step>
+    </steps>
+    <result>
+      <p>
+        <image height="171" href="../image/carwash.jpg" placement="inline" width="249">
+          <alt>washing the car</alt>
+        </image>
+      </p>
+    </result>
+  </taskbody>
+  
+</task>

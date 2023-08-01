@@ -1,7 +1,18 @@
-Add tags to the following text to make it into a DITA document.
+Add tags to the following text to make it into a DITA Topic.
+
+Use this DOCTYPE:
+
+<!DOCTYPE topic
+  PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
 
 Keep the text as similar to the original as possible.
 
 Never remove content.
 
+Do not turn figures into images. Use code blocks.
+
 Make sure that the root element has an id.
+
+Here are some elements you should consider:
+
+topic, title, prolog, body, shortdesc, prereq, task, steps, step, cmd, note, p, ul, li, dl, dt, dd, codeph, b, xref

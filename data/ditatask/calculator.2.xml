@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="start-calculator-app">
+    <title>How to Start the Calculator App</title>
+    <shortdesc>Here you will find information on how to start the Calculator app on your mobile phone.</shortdesc>
+    <taskbody>
+        <prereq>To use the calculator app, you need to unlock your phone first.</prereq>
+        <steps>
+            <step><cmd>Navigate to the Calculator application icon.</cmd></step>
+            <step><cmd>Tap the icon.</cmd></step>
+        </steps>
+        <result>The application starts. You are now ready to calculate with it.</result>
+    </taskbody>
+</task>

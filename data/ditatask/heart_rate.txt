@@ -1,0 +1,12 @@
+Title: Using the Heart Rate Monitor
+
+Introduction:
+The heart rate monitor helps doctors to accurately measure patients' heart rates in real-time. 
+
+Prerequisite: Ensure the device is sanitized before use.
+
+Steps:
+1. Turn on the device by pressing the power button.
+2. Place the monitor on the patient’s finger.
+3. Wait for the device to calibrate.
+4. Read the heart rate on the device screen.

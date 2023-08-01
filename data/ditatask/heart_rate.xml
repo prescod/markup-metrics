@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="heart_rate_monitor">
+   <title>Using the Heart Rate Monitor</title>
+   <shortdesc>The heart rate monitor helps doctors to accurately measure patients' heart rates in real-time.</shortdesc>  
+   <taskbody>
+    <prereq>Ensure the device is sanitized before use.</prereq>
+    <steps>
+           <step><cmd>Turn on the device by pressing the power button.</cmd></step>
+           <step><cmd>Place the monitor on the patient’s finger.</cmd></step>
+           <step><cmd>Wait for the device to calibrate.</cmd></step>
+           <step><cmd>Read the heart rate on the device screen.</cmd></step>
+       </steps>
+    </taskbody>
+</task>

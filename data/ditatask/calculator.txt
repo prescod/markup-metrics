@@ -1,0 +1,13 @@
+** How to Start the Calculator App **
+
+    Here you will find information on how to start the Calculator app on your mobile phone.
+
+Prequisite: To use the calculator app, you need to unlock your phone first.
+
+Steps:
+
+1.  Navigate to the Calculator application icon.
+
+2.  Tap the icon.
+
+The application starts. You are now ready to calculate with it.

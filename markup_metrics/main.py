@@ -245,24 +245,25 @@ def output_results(automarkup_engine_scripts, metric_engine_scripts, datadir, ou
 
 
 def main():
+    pkg_root = str(Path(__file__).parent.parent)
     parser = argparse.ArgumentParser(description="Evaluate markup script.")
     parser.add_argument(
         "--automarkup-engines",
         type=str,
-        default="markup_engines/*_automarkup.py",
+        default=f"{pkg_root}/markup_engines/*_automarkup.py",
         help="Glob pattern for the scripts containing the AutoMarkup classes.",
     )
     parser.add_argument(
         "--metric-engines",
         type=str,
-        default="metric_engines/*_metric.py",
+        default=f"{pkg_root}/metric_engines/*_metric.py",
         help="Glob pattern for the scripts containing the MetricEngine classes.",
     )
     parser.add_argument(
-        "--datadir", type=str, default="./data", help="Path to the data directory."
+        "--datadir", type=Path, default=f"{pkg_root}/data", help="Path to the data directory."
     )
     parser.add_argument(
-        "--outdir", type=str, default="./out", help="Path to the output directory."
+        "--outdir", type=Path, default="./out", help="Path to the output directory."
     )
     parser.add_argument(
         "--char-tokenizer", action="store_true", help="Use character tokenizer."
@@ -278,13 +279,13 @@ def main():
     metric_engine_scripts = glob.glob(args.metric_engines)
 
     if not metric_engine_scripts:
-        print("No metric engines found.")
+        print("No metric engines found.", args.metric_engines)
         return
 
     automarkup_engine_scripts = glob.glob(args.automarkup_engines)
 
     if not automarkup_engine_scripts:
-        print("No automarkup engines found.")
+        print("No automarkup engines found.", args.automarkup_engines)
         return
     
     output_results(automarkup_engine_scripts, metric_engine_scripts, datadir, outdir, tokenizer)

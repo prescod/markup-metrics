@@ -7,24 +7,32 @@ class TokenizingSaxHandler(xml.sax.ContentHandler):
         self.chars = []
 
     def startElement(self, name, attrs):
+        self.flush_chars()
         self.tokens.append(f"<{name} ")
         # Sort attributes by key
-        for attr_name in sorted(attrs.keys()):
-            self.tokens.append(f'{attr_name}="{attrs[attr_name]}" ')
+        for attr_name, attr_value in sorted(attrs.items()):
+            if attr_name=="id":
+                attr_value = f"ID {len(self.tokens)}"
+            self.tokens.append(f'{attr_name}="{attr_value}" ')
         self.tokens.append(">")
 
     def endElement(self, name):
         # Process characters buffer as text
-        text = ''.join(self.chars).strip()
-        if text:
-            self.tokens.append(text)
-        self.chars = []
+        self.flush_chars()
         self.tokens.append(f"</{name}>")
-
 
     def characters(self, content):
         # Buffer characters for later processing
         self.chars.append(content)
+
+    def flush_chars(self):
+        # Process characters buffer as text
+        if self.chars:
+            text = ' '.join(c for c in self.chars)
+            text = ' '.join(text.split()).strip()
+            if text:
+                self.tokens.append(text)
+        self.chars = []
 
 
 def tokenize_xml(xml_string):

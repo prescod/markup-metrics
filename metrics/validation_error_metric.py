@@ -7,18 +7,14 @@ from metrics.types import MetricInput
 
 class MetricEngine:
     """A metric which validates the DTD validity of the hypothesis XML.
-    
-    A score of 0 means the XML is well-formed and there are no DTD errors.
-    The first DTD error drops the perfect score to 0.2.
-    The first well-formedness error drops the perfect score to 0.5.
-    The score between 1 error and 100% errors is linear, based on the percent of correct tags.
+
     """
 
     unit = "%"
     
     def calculate(self, input: MetricInput, output_file_dir: Path) -> float:
         hypothesis_xml = input.hypothesis_text
-        perfect_score = 0
+        # perfect_score = 0
 
         # First, check if the XML is well-formed without DTD validation
         well_formed_parser = etree.XMLParser(recover=True)
@@ -37,7 +33,6 @@ class MetricEngine:
             output_file_path = output_file_dir / "well_formedness_errors.txt"
             
             output_file_path.write_text("\n".join( errors))
-            perfect_score = 0.5
 
         # Check for DTD in the hypothesis
         has_dtd = '<!DOCTYPE' in hypothesis_xml
@@ -45,26 +40,28 @@ class MetricEngine:
         # Perform DTD validation only if DTD is present
         if has_dtd:
             dtd_parser = etree.XMLParser(dtd_validation=True, load_dtd=True, recover=True, resolve_entities=True)
-            tree = etree.parse(BytesIO(hypothesis_xml.encode()), dtd_parser)
+            etree.parse(BytesIO(hypothesis_xml.encode()), dtd_parser)
             # Get the number of DTD errors
             num_dtd_errors = len(dtd_parser.error_log)
 
-            # If there are DTD errors, the perfect score is 0.2
             if num_dtd_errors > 0:
-                perfect_score = min(perfect_score, 0.2)
                 errors = list(map(str, dtd_parser.error_log))
                 output_file_path = output_file_dir / "dtd_errors.txt"
                 output_file_path.write_text("\n".join(["DTD errors: "] + errors ))
         else:
             num_dtd_errors = 0
-        
 
-        # Calculate the score linearly based on the percent of correct tags
-        total_errors = max(num_wf_errors, num_dtd_errors)
+        # Calculate the score based on the percent of correct tags
+        total_errors = num_wf_errors + num_dtd_errors
+        good_elements  = total_elements - total_errors
 
-        wrong_tags_ratio = total_errors / total_elements
-        score = (1 - perfect_score) * wrong_tags_ratio
-        return score * 100
+        # in case any elements generated multiple errors, we might have a negative number
+        good_elements = max(0, good_elements)
+
+        good_tags_ratio = good_elements / total_elements
+        # flip it back to a zero to 100 score with better scores being better
+        res = good_tags_ratio * 100
+        return res
 
 # Test code
 if __name__ == "__main__":

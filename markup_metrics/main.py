@@ -1,27 +1,19 @@
-import cProfile
-import contextlib
-import importlib.util
 import glob
-import os
 from pathlib import Path
 import argparse
 import shutil
-import time
 from xml.etree.ElementTree import XMLParser, parse
 from xml.sax import SAXParseException
+from markup_engines.types import MarkupEngine
+from markup_metrics.profile_logger import ProfileLogger
+from markup_metrics.test_metrics import MetricEngine
 from metrics.types import MetricInput
 from typing import Any, Callable, Generator, List, NamedTuple, Optional, Protocol, Tuple, Type
 import statistics
 from markup_metrics.tokenize_xml import tokenize_xml
 from prettytable import PrettyTable
 
-
-def load_class(script: str, class_name: str):
-    spec = importlib.util.spec_from_file_location("module", script)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return getattr(module, class_name)
+from .utils import load_engine, setup_catalog_env_var
 
 
 def parse_prompt(schema_dir: Path) -> str:
@@ -41,21 +33,6 @@ def parse_reference_text(xml_path: Path) -> Optional[str]:
         return None
 
 
-class ProfileLog(NamedTuple):
-    name: str
-    time: float
-
-class ProfileLogger:
-    def __init__(self) -> None:
-        self.times: List[ProfileLog] = []
-
-    @contextlib.contextmanager
-    def log_time(self, context:str) -> Generator[None, None, None]:
-        start = time.perf_counter()
-        yield
-        end = time.perf_counter()
-        self.times.append(ProfileLog(context, end - start))
-
 
 def process_file(
     txt_path: Path,
@@ -66,7 +43,27 @@ def process_file(
     engine_outdir: Path,
     prof_log: ProfileLogger,
 ) -> Tuple[float, bool, Optional[Path]]:
-    xml_path = txt_path.with_suffix(".xml")
+    xml_paths = list(txt_path.parent.glob(f"{txt_path.stem}.xml")) + list(txt_path.parent.glob(f"{txt_path.stem}.*.xml"))
+    results = []
+    for xml_path in xml_paths:
+        try:
+            result = compare_with_reference(xml_path, txt_path, automarkup, metric_engine, prompt, tokenizer, engine_outdir, prof_log)
+        except Exception as e:
+            print(f"            Error: {e}")
+            result = 0, False, None
+        results.append(result)
+    return max(results)
+
+        
+def compare_with_reference(    
+    xml_path: Path, 
+    txt_path: Path,
+    automarkup,
+    metric_engine,
+    prompt: str,
+    tokenizer: Callable,
+    engine_outdir: Path,
+    prof_log: ProfileLogger):
     reference_text = parse_reference_text(xml_path)
     if reference_text is None:
         return 0, False, None
@@ -74,11 +71,11 @@ def process_file(
     with txt_path.open("r") as file:
         input_text = file.read()
 
-    with prof_log.log_time(f"{metric_engine.name} for: {txt_path}"):  # <- Add this context manager
+    with prof_log.log_time(f"{metric_engine.name} for: {txt_path}"):
         output_text = automarkup.automarkup(input_text, prompt)
     relative_path = txt_path.relative_to(txt_path.parent.parent)
     output_file_path = (
-        engine_outdir / relative_path.parent / txt_path.stem / (txt_path.stem + ".xml")
+        engine_outdir / relative_path.parent / txt_path.stem / (xml_path.stem + ".xml")
     )
     output_file_path.parent.mkdir(parents=True, exist_ok=True)
     with output_file_path.open("w") as output_file:
@@ -112,8 +109,8 @@ def process_file(
 
 def process_schema_directory(
     schema_dir: Path,
-    automarkup,
-    metric_engine,
+    automarkup: MarkupEngine,
+    metric_engine: MetricEngine,
     tokenizer: Callable,
     engine_outdir: Path,
     prof_log: ProfileLogger,
@@ -142,18 +139,6 @@ def process_schema_directory(
     return score_sum, file_count, error_count
 
 
-def load_engine(engine_script: str, class_name: str) -> Optional[Type]:
-    engine_class = load_class(engine_script, class_name)
-    engine_name = Path(engine_script).stem
-    engine_class.name = engine_name
-    try:
-        engine_instance = engine_class()
-    except AssertionError as e:
-        print(f"Cannot instantiate {class_name.lower()} engine: ", e)
-        print(f"Skipping {class_name.lower()} engine: ", engine_class.name)
-        return None
-    return engine_instance
-
 
 # Protocol for engines
 class Engine(Protocol):
@@ -175,8 +160,8 @@ class ProcessingResult(NamedTuple):
 
 
 def process_automarkup_metric_combination(
-        markup_engine: Engine,
-        metric_engine: Engine,
+        markup_engine: MarkupEngine,
+        metric_engine: MetricEngine,
         datadir: Path,
         outdir: Path,
         tokenizer: Tokenizer,
@@ -282,12 +267,7 @@ def main():
     )
 
     args = parser.parse_args()
-
-    if os.environ.get("XML_CATALOG_FILES"):
-        print("XML_CATALOG_FILES set, ignoring and overriding it.")
-    catalog_files = Path(__file__).parent.parent / "schemas/catalog.xml"
-    os.environ["XML_CATALOG_FILES"] = str(catalog_files)
-    assert catalog_files.exists()
+    setup_catalog_env_var()
 
     tokenizer = tokenize_xml if not args.char_tokenizer else list
     datadir = Path(args.datadir)

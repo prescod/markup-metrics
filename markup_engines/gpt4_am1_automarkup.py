@@ -47,4 +47,9 @@ class AutoMarkup:
         else:
             markup = markup[doctype_loc:]
 
-        return markup.strip().strip("`")
+        res = markup.strip().strip("`")
+
+        if not res.startswith("<?xml"):
+            res = '<?xml version="1.0" encoding="UTF-8"?>\n' + res
+
+        return res

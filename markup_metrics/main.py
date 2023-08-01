@@ -1,17 +1,19 @@
-import glob
-from pathlib import Path
 import argparse
+import glob
 import shutil
+import statistics
+from pathlib import Path
+from typing import (Any, Callable, Generator, List, NamedTuple, Optional,
+                    Protocol, Tuple, Type)
 from xml.etree.ElementTree import XMLParser, parse
 from xml.sax import SAXParseException
+
+from prettytable import PrettyTable
+
 from markup_engines.types import MarkupEngine
 from markup_metrics.profile_logger import ProfileLogger
-from markup_metrics.test_metrics import MetricEngine
-from metrics.types import MetricInput
-from typing import Any, Callable, Generator, List, NamedTuple, Optional, Protocol, Tuple, Type
-import statistics
 from markup_metrics.tokenize_xml import tokenize_xml
-from prettytable import PrettyTable
+from metric_engines.types import MetricInput, MetricEngine
 
 from .utils import load_engine, setup_catalog_env_var
 
@@ -253,7 +255,7 @@ def main():
     parser.add_argument(
         "--metric-engines",
         type=str,
-        default="metrics/*_metric.py",
+        default="metric_engines/*_metric.py",
         help="Glob pattern for the scripts containing the MetricEngine classes.",
     )
     parser.add_argument(

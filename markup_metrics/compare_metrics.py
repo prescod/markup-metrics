@@ -1,20 +1,16 @@
 import argparse
 from glob import glob
 from pathlib import Path
-from typing import List, Protocol, Tuple
-from markup_metrics.profile_logger import ProfileLogger
-from markup_metrics.utils import load_engine
+from typing import List, Tuple
+
 from prettytable import PrettyTable
-from metrics.types import MetricInput
+
+from markup_metrics.profile_logger import ProfileLogger
 from markup_metrics.tokenize_xml import tokenize_xml
+from markup_metrics.utils import load_engine
+from metric_engines.types import MetricEngine, MetricInput
+
 from .utils import setup_catalog_env_var
-
-class MetricEngine(Protocol):
-    unit: str
-    name: str
-
-    def calculate(self, input: MetricInput, output_file_dir: Path) -> float:
-        ...
 
 
 def calculate_metrics(datadir: Path, engines: List[MetricEngine], prof_log: ProfileLogger, out: Path) -> List[Tuple[str, str, str, float]]:

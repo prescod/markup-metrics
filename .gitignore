@@ -6,3 +6,5 @@ out
 .DS_Store
 .envrc
 arjun_example_files
+dist/
+*.egg-info

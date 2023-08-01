@@ -3,7 +3,7 @@ from lxml import etree
 from io import BytesIO, StringIO
 from typing import List
 
-from metrics.types import MetricInput
+from metric_engines.types import MetricInput
 
 class MetricEngine:
     """A metric which validates the DTD validity of the hypothesis XML.

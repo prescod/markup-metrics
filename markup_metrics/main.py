@@ -132,8 +132,9 @@ def process_schema_directory(
             if success:
                 file_count += 1
                 score_sum += score
+                short_path = txt_path.relative_to(schema_dir.parent)
                 print(
-                    f"            {txt_path} ({output_file}): {score:.2f}{metric_engine.unit}"
+                    f"            {short_path} ({output_file}): {score:.2f}{metric_engine.unit}"
                 )
             else:
                 error_count += 1
@@ -276,13 +277,13 @@ def main():
     datadir = Path(args.datadir)
     outdir = Path(args.outdir)
 
-    metric_engine_scripts = glob.glob(args.metric_engines)
+    metric_engine_scripts = sorted(glob.glob(args.metric_engines))
 
     if not metric_engine_scripts:
         print("No metric engines found.", args.metric_engines)
         return
 
-    automarkup_engine_scripts = glob.glob(args.automarkup_engines)
+    automarkup_engine_scripts = sorted(glob.glob(args.automarkup_engines))
 
     if not automarkup_engine_scripts:
         print("No automarkup engines found.", args.automarkup_engines)

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "markup_metrics"
-version = "0.2"
+version = "0.2.1"
 description = "Testing Tool for comparing implementations of Automatic Markup (Auto-Markup) tools."
 readme = "README.md"
 authors = [{ name = "Paul Prescod", email = "paul@prescod.net" }]

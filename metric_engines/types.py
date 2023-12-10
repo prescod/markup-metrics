@@ -1,8 +1,10 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple, Protocol, Sequence
+from pathlib import Path
 
 if TYPE_CHECKING:
     from markup_metrics.main import ProfileLogger
+
 
 class MetricEngine(Protocol):
     unit: str
@@ -13,6 +15,8 @@ class MetricEngine(Protocol):
 
 
 class MetricInput(NamedTuple):
+    input_file: Path
+    input_text: str
     hypothesis_text: str
     reference_text: str
     hypothesis_tokens: Sequence[str]

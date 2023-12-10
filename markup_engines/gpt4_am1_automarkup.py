@@ -4,6 +4,7 @@ import json
 import hashlib
 from pathlib import Path
 import guidance
+import guidance.llms as llms
 
 
 class AutoMarkup:
@@ -27,7 +28,7 @@ class AutoMarkup:
     max_tokens = 8191
 
     def __init__(self):
-        self.llm = guidance.llms.OpenAI(self.model)
+        self.llm = llms.OpenAI(self.model)
         assert (
             self.llm.api_key is not None
         ), "You must provide an OpenAI API key to use the OpenAI LLM. Either pass it in the constructor, set the OPENAI_API_KEY environment variable, or create the file ~/.openai_api_key with your key in it."

@@ -11,7 +11,7 @@ class TokenizingSaxHandler(xml.sax.ContentHandler):
         self.tokens.append(f"<{name} ")
         # Sort attributes by key
         for attr_name, attr_value in sorted(attrs.items()):
-            if attr_name=="id":
+            if attr_name == "id":
                 attr_value = f"ID {len(self.tokens)}"
             self.tokens.append(f'{attr_name}="{attr_value}" ')
         self.tokens.append(">")
@@ -28,19 +28,21 @@ class TokenizingSaxHandler(xml.sax.ContentHandler):
     def flush_chars(self):
         # Process characters buffer as text
         if self.chars:
-            text = ' '.join(c for c in self.chars)
-            text = ' '.join(text.split()).strip()
+            text = " ".join(c for c in self.chars)
+            text = " ".join(text.split()).strip()
             if text:
                 self.tokens.append(text)
         self.chars = []
 
 
-def tokenize_xml(xml_string):
-    handler = TokenizingSaxHandler()
-    xml.sax.parseString(xml_string, handler)
-    return handler.tokens
+class Tokenizer:
+    def tokenize(self, xml_string):
+        handler = TokenizingSaxHandler()
+        xml.sax.parseString(xml_string, handler)
+        return handler.tokens
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     # Test XML
     xml_string = """
     <note date="8/31/12" to="Tove">
@@ -52,7 +54,7 @@ if __name__=="__main__":
     """
 
     # Run the parser
-    tokens = tokenize_xml(xml_string)
+    tokens = Tokenizer().tokenize(xml_string)
 
     # Output the tokens
     for token in tokens:

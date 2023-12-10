@@ -10,10 +10,12 @@ readme = "README.md"
 authors = [{ name = "Paul Prescod", email = "paul@prescod.net" }]
 
 dependencies = [
-    "pyter3>=0.3",
-    "guidance>=0.0.61",
+    "pyter3==0.3",
+    "guidance==0.0.61",
     "lxml>=4.9.2",
     "prettytable>=3.7.0",
+    "openai<=0.27.0",
+    "pyyaml",
 ]
 
 [tool.hatch.build.targets.wheel.force-include]

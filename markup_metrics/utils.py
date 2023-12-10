@@ -2,11 +2,11 @@ import importlib.util
 import os
 from pathlib import Path
 from typing import Optional, Type
-    
+
 
 def load_class(script: str, class_name: str):
     spec = importlib.util.spec_from_file_location("module", script)
-    assert spec and spec.loader
+    assert spec and spec.loader, f"Cannot load {script}"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return getattr(module, class_name)
@@ -23,6 +23,7 @@ def load_engine(engine_script: str, class_name: str) -> Optional[Type]:
         print(f"Skipping {class_name.lower()} engine: ", engine_class.name)
         return None
     return engine_instance
+
 
 def setup_catalog_env_var():
     if os.environ.get("XML_CATALOG_FILES"):

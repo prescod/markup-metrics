@@ -1,4 +1,5 @@
 import xml.sax
+from markup_engines.types import Tokenizer as TokenizerProtocol
 
 
 class TokenizingSaxHandler(xml.sax.ContentHandler):
@@ -35,7 +36,7 @@ class TokenizingSaxHandler(xml.sax.ContentHandler):
         self.chars = []
 
 
-class Tokenizer:
+class XMLTokenizer(TokenizerProtocol):
     def tokenize(self, xml_string):
         handler = TokenizingSaxHandler()
         xml.sax.parseString(xml_string, handler)

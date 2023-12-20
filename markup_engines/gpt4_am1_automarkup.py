@@ -54,3 +54,11 @@ class AutoMarkup:
             res = '<?xml version="1.0" encoding="UTF-8"?>\n' + res
 
         return res
+
+    def output_parameters(self, outdir: Path) -> None:
+        (outdir / "message.txt").write_text(self.message)
+        (outdir / "model.txt").write_text(self.model)
+        current_file = Path(__file__).resolve()
+        (outdir / "code.txt").write_text(
+            current_file.read_text(encoding="utf-8"), encoding="utf-8"
+        )

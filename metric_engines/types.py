@@ -22,3 +22,12 @@ class MetricInput(NamedTuple):
     hypothesis_tokens: Sequence[str]
     reference_tokens: Sequence[str]
     profile_logger: ProfileLogger
+
+
+class MetricOutput(NamedTuple):
+    input_file: str
+    input_text: str
+    reference_text: str
+    reference_tokens: str
+    hypothesis_text: str
+    hypothesis_tokens: str

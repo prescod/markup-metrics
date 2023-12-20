@@ -5,7 +5,7 @@ from typing import Optional, Type
 
 
 def load_class(script: str, class_name: str):
-    spec = importlib.util.spec_from_file_location("module", script)
+    spec = importlib.util.spec_from_file_location(script, script)
     assert spec and spec.loader, f"Cannot load {script}"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

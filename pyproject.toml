@@ -16,6 +16,7 @@ dependencies = [
     "prettytable>=3.7.0",
     "openai<=0.27.0",
     "pyyaml",
+    "diskcache",
 ]
 
 [tool.hatch.build.targets.wheel.force-include]

@@ -1,47 +1,94 @@
 import argparse
+import csv
+from fnmatch import fnmatch
 import glob
+from pyexpat import ExpatError
 import shutil
 import statistics
+import time
 from pathlib import Path
 import traceback
 from typing import (
-    Any,
-    Callable,
-    Generator,
     List,
     NamedTuple,
     Optional,
     Protocol,
     Tuple,
-    Type,
+    cast,
 )
-from xml.etree.ElementTree import XMLParser, parse
+from xml.etree.ElementTree import parse
 from xml.sax import SAXParseException
+import yaml
 
 from prettytable import PrettyTable
 
 from markup_engines.types import MarkupEngine, Tokenizer as TokenizerProtocol
 from markup_metrics.profile_logger import ProfileLogger
-from markup_metrics.tokenize_xml import Tokenizer as XMLTokenizer
+from markup_metrics.tokenize_xml import XMLTokenizer
 from metric_engines.types import MetricInput, MetricEngine
 
 from .utils import load_engine, setup_catalog_env_var
 
 
+class LogResult(NamedTuple):
+    input_file: str
+    markup_engine: str
+    metric_engine: str
+    score: float
+    unit: str
+    input_text: str
+    hypothesis_text: str
+    reference_text: str
+
+
+class SimpleLogger:
+    def __init__(self, filename: Path) -> None:
+        self.file = filename.open("w")
+        self._results = []
+
+    def log(self, *message: str) -> None:
+        joined = " ".join(str(m) for m in message)
+        self.file.write(joined + "\n")
+        self.file.flush()
+        print(joined)
+
+    def log_result(self, row):
+        self._results.append(row)
+
+
+class Config(NamedTuple):
+    automarkup_engine_scripts: list[str]
+    metric_engine_scripts: list[str]
+    datadir: Path
+    outdir: Path
+    tokenizer: TokenizerProtocol
+    logger: SimpleLogger
+    prof_logger: ProfileLogger
+    filter_list: Optional[List[str]]
+    operation: str  # maybe this should be inferred from the engine instead
+    halt_on_error: bool
+    save_as_test_cases: bool = False
+
+
 def parse_prompt(schema_dir: Path) -> str:
     prompt_path = schema_dir / "prompt.txt"
-    with prompt_path.open("r") as file:
-        return file.read()
+    if prompt_path.exists():
+        with prompt_path.open("r") as file:
+            return file.read()
+    else:
+        return ""
 
 
-def parse_reference_text(xml_path: Path, tokenizer: TokenizerProtocol) -> Optional[str]:
+def parse_reference_text(
+    xml_path: Path, tokenizer: TokenizerProtocol, logger: SimpleLogger
+) -> Optional[str]:
     try:
         with xml_path.open("r") as file:
             reference_text = file.read()
             tokenizer.tokenize(reference_text)
             return reference_text
     except SAXParseException:
-        print(f"Error: XML parsing failed for {xml_path}")
+        logger.log(f"Error: XML parsing failed for {xml_path}")
         return None
 
 
@@ -50,130 +97,201 @@ def process_file(
     automarkup,
     metric_engine,
     prompt: str,
-    tokenizer: TokenizerProtocol,
     engine_outdir: Path,
-    prof_log: ProfileLogger,
-    halt_on_error: bool,
-) -> Tuple[float, bool, Optional[Path]]:
-    xml_paths = list(txt_path.parent.glob(f"{txt_path.stem}.xml")) + list(
-        txt_path.parent.glob(f"{txt_path.stem}.*.xml")
+    config: Config,
+) -> Tuple[float, bool, Optional[Path], Optional[MetricInput]]:
+    if config.operation:
+        extension = f"{config.operation}.xml"
+    else:
+        extension = "xml"
+
+    xml_paths = list(txt_path.parent.glob(f"{txt_path.stem}.{extension}")) + list(
+        txt_path.parent.glob(f"{txt_path.stem}.[0-9]*.{extension}")
     )
-    results = []
-    for xml_path in xml_paths:
-        try:
-            result = compare_with_reference(
-                xml_path,
-                txt_path,
-                automarkup,
-                metric_engine,
-                prompt,
-                tokenizer,
-                engine_outdir,
-                prof_log,
-            )
-        except Exception as e:
-            if halt_on_error:
-                raise e
-            print(f"            Error: {e}")
-            traceback.print_exc()
-            result = 0, False, None
-        results.append(result)
-    return max(results)
+
+    # save the output of the markup engines as test cases if there are none
+    if config.save_as_test_cases and not xml_paths:
+        automarkup_output = automarkup.automarkup(txt_path.read_text(), prompt)
+        (txt_path.parent / f"{txt_path.stem}.{extension}").write_text(automarkup_output)
+
+    try:
+        output_file_path, output_text = do_automarkup(
+            txt_path, prompt, engine_outdir, automarkup, config
+        )
+    except (UnicodeDecodeError, SAXParseException, ExpatError, ValueError) as e:
+        config.logger.log(f"            Error: {e} for {txt_path}")
+        return (0, False, None, None)
+
+    results = [
+        compare_with_reference_safe(
+            xml_path,
+            txt_path,
+            metric_engine,
+            output_file_path,
+            output_text,
+            config,
+        )
+        for xml_path in xml_paths
+    ]
+    return max(results) if results else (0, False, None, None)
+
+
+def compare_with_reference_safe(
+    xml_path,
+    txt_path,
+    metric_engine,
+    output_file_path,
+    output_text,
+    config,
+) -> Tuple[float, bool, Optional[Path], Optional[MetricInput]]:
+    try:
+        result = compare_with_reference(
+            xml_path,
+            txt_path,
+            metric_engine,
+            output_file_path,
+            output_text,
+            config,
+        )
+    except Exception as e:
+        if config.halt_on_error:
+            raise e
+        config.logger.log(f"            Error: {e}")
+        traceback.print_exc()
+        result = 0, False, None, None
+    return result
+
+
+counter = 0
 
 
 def compare_with_reference(
     xml_path: Path,
     txt_path: Path,
-    automarkup,
     metric_engine,
-    prompt: str,
-    tokenizer: TokenizerProtocol,
-    engine_outdir: Path,
-    prof_log: ProfileLogger,
-):
-    reference_text = parse_reference_text(xml_path, tokenizer)
+    output_file_path: Path,
+    output_text: str,
+    config: Config,
+) -> Tuple[float, bool, Optional[Path], Optional[MetricInput]]:
+    reference_text = parse_reference_text(xml_path, config.tokenizer, config.logger)
     if reference_text is None:
-        return 0, False, None
-
-    with txt_path.open("r") as file:
-        try:
-            input_text = file.read()
-        except UnicodeDecodeError:
-            print(f"            Error: UnicodeDecodeError for {txt_path}")
-            return 0, False, None
-
-    with prof_log.log_time(f"{metric_engine.name} for: {txt_path}"):
-        output_text = automarkup.automarkup(input_text, prompt)
-    relative_path = txt_path.relative_to(txt_path.parent.parent)
-    output_file_path = (
-        engine_outdir / relative_path.parent / txt_path.stem / (xml_path.stem + ".xml")
-    )
-    output_file_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_file_path.open("w") as output_file:
-        output_file.write(output_text)
+        return 0, False, None, None
 
     try:
-        tokenizer.tokenize(output_text)
+        config.tokenizer.tokenize(output_text)
     except SAXParseException as e:
-        print(
+        config.logger.log(
             f"            Error: XML parsing failed for output, saved to {output_file_path} : {e}"
         )
-        return 0, False, None
+        return 0, False, None, None
 
     validator_input = MetricInput(
         txt_path,
         txt_path.read_text(),
         output_text,
         reference_text,
-        tokenizer.tokenize(output_text),
-        tokenizer.tokenize(reference_text),
-        profile_logger=prof_log,
+        config.tokenizer.tokenize(output_text),
+        config.tokenizer.tokenize(reference_text),
+        profile_logger=config.prof_logger,
     )
     metric_output = Path(f"{output_file_path}__{metric_engine.name}")
     if metric_output.exists():
         shutil.rmtree(metric_output)
 
     metric_output.mkdir(parents=True, exist_ok=True)
-    with prof_log.log_time(f"{metric_engine.name} for : {txt_path}"):
+    with config.prof_logger.log_time(f"{metric_engine.name} for : {txt_path}"):
         score = metric_engine.calculate(validator_input, metric_output)
+        output_report = metric_output / "report.yml"
+        output_report.write_text(
+            yaml.dump(
+                {
+                    "input_file": str(validator_input.input_file.absolute()),
+                    "input_text": validator_input.input_text,
+                    "reference_text": validator_input.reference_text,
+                    "hypothesis_text": validator_input.hypothesis_text,
+                    "hypothesis_tokens": validator_input.hypothesis_tokens,
+                    "reference_tokens": validator_input.reference_tokens,
+                }
+            )
+        )
 
-    return score, True, output_file_path
+    return score, True, output_file_path, validator_input
+
+
+def do_automarkup(
+    txt_path: Path,
+    prompt: str,
+    engine_outdir: Path,
+    automarkup: MarkupEngine,
+    config: Config,
+):
+    with txt_path.open("r") as file:
+        input_text = file.read()
+    with config.prof_logger.log_time(f"{automarkup.name} for: {txt_path}"):
+        global counter
+        counter += 1
+        output_text = automarkup.automarkup(input_text, prompt)
+    relative_path = txt_path.relative_to(txt_path.parent.parent)
+    output_file_path = (
+        engine_outdir
+        / relative_path.parent
+        / txt_path.stem
+        / (txt_path.stem + config.operation + ".xml")
+    )
+    output_file_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_file_path.open("w") as output_file:
+        output_file.write(output_text)
+
+    return output_file_path, output_text
 
 
 def process_schema_directory(
     schema_dir: Path,
     automarkup: MarkupEngine,
     metric_engine: MetricEngine,
-    tokenizer: TokenizerProtocol,
     engine_outdir: Path,
-    prof_log: ProfileLogger,
-    halt_on_error: bool,
+    config: Config,
 ) -> Tuple[float, int, list]:
     prompt = parse_prompt(schema_dir)
     score_sum = 0
     file_count = 0
     errors = []
 
-    print(f"     {schema_dir.stem}")
+    config.logger.log(f"     {schema_dir.stem}")
+
+    filter_list = config.filter_list or ["*.txt"]
 
     for txt_path in schema_dir.glob("*.txt"):
-        if txt_path.stem != "prompt":
-            score, success, output_file = process_file(
+        pattern_matches = any(
+            fnmatch(str(txt_path.absolute()), "*/" + f) for f in filter_list
+        )
+        if txt_path.stem != "prompt" and pattern_matches:
+            score, success, output_file, metric_input = process_file(
                 txt_path,
                 automarkup,
                 metric_engine,
                 prompt,
-                tokenizer,
                 engine_outdir,
-                prof_log,
-                halt_on_error,
+                config,
             )
             if success:
                 file_count += 1
                 score_sum += score
                 short_path = txt_path.relative_to(schema_dir.parent)
-                print(
+                config.logger.log(
                     f"            {short_path} ({output_file}): {score:.2f}{metric_engine.unit}"
+                )
+                config.logger.log_result(
+                    LogResult(
+                        str(short_path),
+                        automarkup.name,
+                        metric_engine.name,
+                        score,
+                        metric_engine.unit,
+                        metric_input.input_text if metric_input else "",
+                        metric_input.hypothesis_text if metric_input else "",
+                        metric_input.reference_text if metric_input else "",
+                    )
                 )
             else:
                 errors.append([txt_path, output_file])
@@ -200,20 +318,17 @@ class ProcessingResult(NamedTuple):
 
 
 def process_automarkup_metric_combination(
-    markup_engine: MarkupEngine,
-    metric_engine: MetricEngine,
-    datadir: Path,
-    outdir: Path,
-    tokenizer: TokenizerProtocol,
-    prof_log: ProfileLogger,
-    halt_on_error: bool,
+    markup_engine: MarkupEngine, metric_engine: MetricEngine, config: Config
 ) -> ProcessingResult:
-    engine_outdir = outdir / markup_engine.name
+    engine_outdir = config.outdir / markup_engine.name
+    if hasattr(markup_engine, "output_parameters"):
+        engine_outdir.mkdir(parents=True, exist_ok=True)
+        markup_engine.output_parameters(engine_outdir)
 
     schema_scores = []
     errors = []
 
-    for schema_dir in datadir.rglob("*"):
+    for schema_dir in config.datadir.rglob("*"):
         if schema_dir.is_dir():
             schema_name = schema_dir.stem
 
@@ -221,10 +336,8 @@ def process_automarkup_metric_combination(
                 schema_dir,
                 markup_engine,
                 metric_engine,
-                tokenizer,
                 engine_outdir,
-                prof_log,
-                halt_on_error,
+                config,
             )
             errors.extend(schema_errors)
 
@@ -235,17 +348,10 @@ def process_automarkup_metric_combination(
     return ProcessingResult(markup_engine.name, metric_engine.name, schema_scores)
 
 
-def output_results(
-    automarkup_engine_scripts,
-    metric_engine_scripts,
-    datadir,
-    outdir,
-    tokenizer,
-    halt_on_error=False,
-):
+def generate_results(config: Config):
     markup_engines = [
         load_engine(automarkup_engine_script, "AutoMarkup")
-        for automarkup_engine_script in automarkup_engine_scripts
+        for automarkup_engine_script in config.automarkup_engine_scripts
     ]
     markup_engines = [
         markup_engine for markup_engine in markup_engines if markup_engine is not None
@@ -253,27 +359,24 @@ def output_results(
 
     metric_engines = [
         load_engine(metric_engine_script, "MetricEngine")
-        for metric_engine_script in metric_engine_scripts
+        for metric_engine_script in config.metric_engine_scripts
     ]
     metric_engines = [
         metric_engine for metric_engine in metric_engines if metric_engine is not None
     ]
 
     table_data = []
-    times = ProfileLogger()
 
     for markup_engine in markup_engines:
         for metric_engine in metric_engines:
-            print(f"Processing {markup_engine.name} with {metric_engine.name}")
+            config.logger.log(
+                f"Processing {markup_engine.name} with {metric_engine.name}"
+            )
 
             result = process_automarkup_metric_combination(
                 markup_engine,
                 metric_engine,
-                datadir,
-                outdir,
-                tokenizer,
-                times,
-                halt_on_error,
+                config,
             )
 
             for schema_score in result.schema_scores:
@@ -317,21 +420,32 @@ def output_results(
                     row["Average Score"],
                 ]
             )
-        print(table)
+        config.logger.log(str(table))
 
-    log_file_path = outdir / "time_logs.txt"
+    log_file_path = config.outdir / "time_logs.txt"
     with log_file_path.open("w") as log_file:
         log_file.write("Context\tTime (s)\tCalls\n")
-        for log in times.times:
+        for log in config.prof_logger.times:
             log_file.write(f"{log.name}\t{log.time:.6f}\n")
 
+    with open(config.outdir / "results.csv", "w") as results_file:
+        csv_writer = csv.DictWriter(
+            results_file, config.logger._results[0]._asdict().keys()
+        )
+        csv_writer.writeheader()
+        csv_writer.writerows(r._asdict() for r in config.logger._results)
 
-class CharacterTokenizer:
+
+class CharacterTokenizer(TokenizerProtocol):
     def tokenize(self, text: str) -> list[str]:
         return list(text)
 
 
-def main():
+class ArgumentParseError(Exception):
+    pass
+
+
+def parse_args() -> Config:
     pkg_root = str(Path(__file__).parent.parent)
     parser = argparse.ArgumentParser(description="Evaluate markup script.")
     parser.add_argument(
@@ -356,22 +470,37 @@ def main():
         "--outdir", type=Path, default="./out", help="Path to the output directory."
     )
     parser.add_argument(
+        "--replace", action="store_true", help="Replace existing output."
+    )
+    parser.add_argument(
         "--tokenizer",
         type=str,
         default="xml",
         help="Use a custom tokenizer or 'xml' or 'char'.",
     )
+    parser.add_argument("--filter-file", type=str, help="Filter file.")
     parser.add_argument("--halt-on-error", action="store_true", help="Halt on error.")
+    parser.add_argument(
+        "--operation",
+        type=str,
+        help="Name of the operation to test. Changes the filenames of the comparisons.",
+    )
+    parser.add_argument(
+        "--save-as-test-cases",
+        action="store_true",
+        help="Save the output of the markup engines as test cases.",
+    )
 
     args = parser.parse_args()
     setup_catalog_env_var()
 
     if args.tokenizer == "xml" or not args.tokenizer:
-        tokenizer = XMLTokenizer()
+        tokenizer: TokenizerProtocol = XMLTokenizer()
     elif args.tokenizer == "char":
         tokenizer = CharacterTokenizer()
     else:
-        tokenizer = load_engine(args.tokenizer, "Tokenizer")
+        tokenizer_engine = load_engine(args.tokenizer, "Tokenizer")
+        tokenizer = cast(TokenizerProtocol, tokenizer_engine)
 
     datadir = Path(args.datadir)
     outdir = Path(args.outdir)
@@ -379,23 +508,59 @@ def main():
     metric_engine_scripts = sorted(glob.glob(args.metric_engines))
 
     if not metric_engine_scripts:
-        print("No metric engines found.", args.metric_engines)
-        return
+        raise ArgumentParseError(f"No metric engines found: {args.metric_engines}")
 
     automarkup_engine_scripts = sorted(glob.glob(args.automarkup_engines))
 
     if not automarkup_engine_scripts:
-        print("No automarkup engines found.", args.automarkup_engines)
-        return
+        raise ArgumentParseError(
+            f"No automarkup engines found: {args.automarkup_engines}"
+        )
 
-    output_results(
+    if args.filter_file:
+        with open(args.filter_file) as f:
+            filter_list = f.read().splitlines()
+    else:
+        filter_list = None
+
+    if outdir.exists():
+        print(
+            f"Out directory already exists: {outdir}"
+            + ("Replacing." if args.replace else "")
+        )
+        if args.replace:
+            shutil.rmtree(outdir)
+        else:
+            raise ArgumentParseError(
+                "Out directory already exists, use --replace to replace."
+            )
+
+    outdir.mkdir(parents=True)
+    logger = SimpleLogger(outdir / "log.txt")
+
+    config = Config(
         automarkup_engine_scripts,
         metric_engine_scripts,
         datadir,
         outdir,
         tokenizer,
-        halt_on_error=args.halt_on_error,
+        logger,
+        ProfileLogger(),
+        filter_list,
+        args.operation or "",
+        args.halt_on_error,
+        args.save_as_test_cases,
     )
+    return config
+
+
+def main():
+    try:
+        config = parse_args()
+    except ArgumentParseError as e:
+        print(str(e))
+        return 1
+    generate_results(config)
 
 
 if __name__ == "__main__":

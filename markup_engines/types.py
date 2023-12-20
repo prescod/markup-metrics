@@ -1,4 +1,5 @@
 from typing import Protocol
+from pathlib import Path
 
 
 class MarkupEngine(Protocol):
@@ -13,6 +14,9 @@ class MarkupEngine(Protocol):
         self._name = value
 
     def automarkup(self, input_text: str, prompt: str) -> str:
+        ...
+
+    def output_parameters(self, outdir: Path) -> None:
         ...
 
 

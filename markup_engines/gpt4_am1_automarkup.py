@@ -34,13 +34,17 @@ class AutoMarkup:
         ), "You must provide an OpenAI API key to use the OpenAI LLM. Either pass it in the constructor, set the OPENAI_API_KEY environment variable, or create the file ~/.openai_api_key with your key in it."
 
     # note that guidance does caching, so I don't need to
-    def automarkup(self, input_text: str, prompt: str) -> str:
+    def automarkup(self, input_text: str, prompt: str, context=None) -> str:
         # Perform the automarkup
         enc = tiktoken.encoding_for_model(self.model)
         used_tokens = len(enc.encode(input_text + prompt + self.message))
         available_tokens = self.max_tokens - used_tokens
         endpoint = guidance(self.message % available_tokens, llm=self.llm)  # type: ignore
         out = endpoint(input=input_text, prompt=prompt)
+
+        if context and context.logger:
+            context.logger.write_file("guidance_data.txt", str(out))
+
         markup = out["markup"]
         doctype_loc = markup.find("<!DOCTYPE")
         if doctype_loc == -1:

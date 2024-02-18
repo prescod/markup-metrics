@@ -22,7 +22,11 @@ import yaml
 
 from prettytable import PrettyTable
 
-from markup_engines.types import MarkupEngine, Tokenizer as TokenizerProtocol
+from markup_engines.types import (
+    MarkupEngine,
+    Tokenizer as TokenizerProtocol,
+    Context as MarkupEngineContext,
+)
 from markup_metrics.profile_logger import ProfileLogger
 from markup_metrics.tokenize_xml import XMLTokenizer
 from metric_engines.types import MetricInput, MetricEngine
@@ -42,15 +46,24 @@ class LogResult(NamedTuple):
 
 
 class SimpleLogger:
-    def __init__(self, filename: Path) -> None:
+    def __init__(self, outdir: Path) -> None:
+        self.outdir = outdir
+        filename = outdir / "log.txt"
         self.file = filename.open("w")
         self._results = []
+
+    def close(self):
+        self.file.close()
 
     def log(self, *message: str) -> None:
         joined = " ".join(str(m) for m in message)
         self.file.write(joined + "\n")
         self.file.flush()
         print(joined)
+
+    def write_file(self, name: str, contents: str) -> None:
+        with open(self.outdir / name, "w", encoding="utf-8") as file:
+            file.write(contents)
 
     def log_result(self, row):
         self._results.append(row)
@@ -68,6 +81,9 @@ class Config(NamedTuple):
     operation: str  # maybe this should be inferred from the engine instead
     halt_on_error: bool
     save_as_test_cases: bool = False
+
+    def close(self):
+        self.logger.close()
 
 
 def parse_prompt(schema_dir: Path) -> str:
@@ -110,10 +126,6 @@ def process_file(
     )
 
     # save the output of the markup engines as test cases if there are none
-    if config.save_as_test_cases and not xml_paths:
-        automarkup_output = automarkup.automarkup(txt_path.read_text(), prompt)
-        (txt_path.parent / f"{txt_path.stem}.{extension}").write_text(automarkup_output)
-
     try:
         output_file_path, output_text = do_automarkup(
             txt_path, prompt, engine_outdir, automarkup, config
@@ -121,6 +133,9 @@ def process_file(
     except (UnicodeDecodeError, SAXParseException, ExpatError, ValueError) as e:
         config.logger.log(f"            Error: {e} for {txt_path}")
         return (0, False, None, None)
+
+    if config.save_as_test_cases and not xml_paths:
+        (txt_path.parent / f"{txt_path.stem}.{extension}").write_text(output_text)
 
     results = [
         compare_with_reference_safe(
@@ -201,8 +216,8 @@ def compare_with_reference(
     metric_output.mkdir(parents=True, exist_ok=True)
     with config.prof_logger.log_time(f"{metric_engine.name} for : {txt_path}"):
         score = metric_engine.calculate(validator_input, metric_output)
-        output_report = metric_output / "report.yml"
-        output_report.write_text(
+        config.logger.write_file(
+            metric_output.name + "report.yml",
             yaml.dump(
                 {
                     "input_file": str(validator_input.input_file.absolute()),
@@ -211,8 +226,9 @@ def compare_with_reference(
                     "hypothesis_text": validator_input.hypothesis_text,
                     "hypothesis_tokens": validator_input.hypothesis_tokens,
                     "reference_tokens": validator_input.reference_tokens,
+                    "score": score,
                 }
-            )
+            ),
         )
 
     return score, True, output_file_path, validator_input
@@ -227,18 +243,16 @@ def do_automarkup(
 ):
     with txt_path.open("r") as file:
         input_text = file.read()
+    relative_path = txt_path.relative_to(txt_path.parent.parent)
+
+    results_dir = engine_outdir / relative_path.parent / txt_path.stem
+    results_dir.mkdir(parents=True, exist_ok=True)
+    output_file_path = results_dir / (txt_path.stem + config.operation + ".xml")
     with config.prof_logger.log_time(f"{automarkup.name} for: {txt_path}"):
         global counter
         counter += 1
-        output_text = automarkup.automarkup(input_text, prompt)
-    relative_path = txt_path.relative_to(txt_path.parent.parent)
-    output_file_path = (
-        engine_outdir
-        / relative_path.parent
-        / txt_path.stem
-        / (txt_path.stem + config.operation + ".xml")
-    )
-    output_file_path.parent.mkdir(parents=True, exist_ok=True)
+        context = MarkupEngineContext(SimpleLogger(results_dir))
+        output_text = automarkup.automarkup(input_text, prompt, context)
     with output_file_path.open("w") as output_file:
         output_file.write(output_text)
 
@@ -356,6 +370,7 @@ def generate_results(config: Config):
     markup_engines = [
         markup_engine for markup_engine in markup_engines if markup_engine is not None
     ]
+    markup_engines = cast(List[MarkupEngine], markup_engines)
 
     metric_engines = [
         load_engine(metric_engine_script, "MetricEngine")
@@ -364,6 +379,7 @@ def generate_results(config: Config):
     metric_engines = [
         metric_engine for metric_engine in metric_engines if metric_engine is not None
     ]
+    metric_engines = cast(List[MetricEngine], metric_engines)
 
     table_data = []
 
@@ -422,11 +438,10 @@ def generate_results(config: Config):
             )
         config.logger.log(str(table))
 
-    log_file_path = config.outdir / "time_logs.txt"
-    with log_file_path.open("w") as log_file:
-        log_file.write("Context\tTime (s)\tCalls\n")
-        for log in config.prof_logger.times:
-            log_file.write(f"{log.name}\t{log.time:.6f}\n")
+    timing = "Context\tTime (s)\tCalls\n"
+    for log in config.prof_logger.times:
+        timing += f"{log.name}\t{log.time:.6f}\n"
+    config.logger.write_file("timing.tsv", timing)
 
     with open(config.outdir / "results.csv", "w") as results_file:
         csv_writer = csv.DictWriter(
@@ -526,7 +541,7 @@ def parse_args() -> Config:
     if outdir.exists():
         print(
             f"Out directory already exists: {outdir}"
-            + ("Replacing." if args.replace else "")
+            + (" Replacing." if args.replace else "")
         )
         if args.replace:
             shutil.rmtree(outdir)
@@ -536,7 +551,7 @@ def parse_args() -> Config:
             )
 
     outdir.mkdir(parents=True)
-    logger = SimpleLogger(outdir / "log.txt")
+    logger = SimpleLogger(outdir)
 
     config = Config(
         automarkup_engine_scripts,
@@ -561,6 +576,7 @@ def main():
         print(str(e))
         return 1
     generate_results(config)
+    config.close()
 
 
 if __name__ == "__main__":
